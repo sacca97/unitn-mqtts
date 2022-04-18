@@ -1,11 +1,11 @@
-package mqtts_unitn
+package crypto
 
 import (
 	"testing"
 )
 
 func TestKeygen(t *testing.T) {
-	a := newCPABE(false, "")
+	a := NewCPABE(false, "")
 	a.GenerateAndSaveMasterKeys()
 }
 

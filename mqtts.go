@@ -1,10 +1,11 @@
-package mqtts_unitn
+package mqtts
 
 import (
 	"fmt"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/sacca97/unitn-mqtts/crypto"
 )
 
 type mqttConfig struct {
@@ -25,7 +26,7 @@ type mqttConfig struct {
 	Version              int
 }
 
-func init() {
+func Init() {
 	cfg := mqtt.NewClientOptions()
 	cfg.AddBroker("tcp://broker.emqx.io:1883")
 	cfg.SetClientID("go_mqtt_client")
@@ -38,14 +39,14 @@ func init() {
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		panic(token.Error())
 	}
-	subscribe(client, "topic/test", 0)
-	publish(client, "topic/test", []byte("Hello World!"))
+	Subscribe(client, "topic/test", 0)
+	Publish(client, "topic/test", []byte("Hello World!"))
 
 }
 
-func handleEncrypted(msg mqtt.Message) {
+func HandleEncrypted(msg mqtt.Message) {
 	ciphertext := msg.Payload()
-	plaintext, err := newCPABE(false, "").DecryptDecode(ciphertext)
+	plaintext, err := crypto.NewCPABE(false, "").DecryptDecode(ciphertext)
 	if err != nil {
 		fmt.Println(plaintext)
 	}
@@ -53,12 +54,12 @@ func handleEncrypted(msg mqtt.Message) {
 	//Do something with the plaintext
 }
 
-func subscribe(client mqtt.Client, topic string, qos byte) {
+func Subscribe(client mqtt.Client, topic string, qos byte) {
 	token := client.Subscribe(topic, qos, nil)
 	token.Wait()
 }
 
-func publish(client mqtt.Client, topic string, payload []byte) error {
+func Publish(client mqtt.Client, topic string, payload []byte) error {
 	token := client.Publish(topic, 0, false, payload)
 	token.Wait()
 	return nil
@@ -71,7 +72,7 @@ func isEncrypted(msg mqtt.Message) bool {
 
 var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 	if isEncrypted(msg) {
-		handleEncrypted(msg)
+		HandleEncrypted(msg)
 	} else {
 		fmt.Println(msg.Topic(), string(msg.Payload()))
 	}

@@ -1,4 +1,4 @@
-package mqtts_unitn
+package crypto
 
 import (
 	"crypto/cipher"
@@ -170,7 +170,7 @@ type cpabe struct {
 	attKey *abe.FAMEAttribKeys
 }
 
-func newCPABE(isPublisher bool, keyPath string) *cpabe {
+func NewCPABE(isPublisher bool, keyPath string) *cpabe {
 
 	s := &cpabe{
 		scheme: abe.NewFAME(),
