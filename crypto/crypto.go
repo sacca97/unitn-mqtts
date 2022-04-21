@@ -2,14 +2,12 @@ package crypto
 
 import (
 	"crypto/cipher"
-	"encoding/binary"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"os"
 
 	"github.com/fentec-project/gofe/abe"
-	"golang.org/x/crypto/chacha20poly1305"
 )
 
 type CipherFunc interface {
@@ -17,61 +15,12 @@ type CipherFunc interface {
 	CipherName() string
 }
 
-// A Cipher is a AEAD cipher that has been initialized with a key.
-type Cipher interface {
-	// Encrypt encrypts the provided plaintext with a nonce and then appends the
-	// ciphertext to out along with an authentication tag over the ciphertext
-	// and optional authenticated data.
-	Encrypt(out []byte, n uint64, ad, plaintext []byte) []byte
-
-	// Decrypt authenticates the ciphertext and optional authenticated data and
-	// then decrypts the provided ciphertext using the provided nonce and
-	// appends it to out.
-	Decrypt(out []byte, n uint64, ad, ciphertext []byte) ([]byte, error)
-}
-
-func cipherChaChaPoly(key []byte) Cipher {
-	c, err := chacha20poly1305.New(key)
-	if err != nil {
-		panic(err)
-	}
-	return aeadCipher{
-		c,
-		func(u uint64) []byte {
-			var nonce [12]byte
-			binary.LittleEndian.PutUint64(nonce[4:], u)
-			return nonce[:]
-		}}
-}
-
-func cipherAESGCM(key []byte) Cipher {
-	c, err := chacha20poly1305.New(key[:])
-	if err != nil {
-		panic(err)
-	}
-	return aeadCipher{
-		c,
-		func(u uint64) []byte {
-			var nonce [12]byte
-			binary.LittleEndian.PutUint64(nonce[4:], u)
-			return nonce[:]
-		}}
-}
-
 type aeadCipher struct {
 	cipher.AEAD
 	nonce func(uint64) []byte
 }
 
-func (c aeadCipher) Encrypt(out []byte, n uint64, ad, plaintext []byte) []byte {
-	return c.Seal(out, c.nonce(n), plaintext, ad)
-}
-
-func (c aeadCipher) Decrypt(out []byte, n uint64, ad, ciphertext []byte) ([]byte, error) {
-	return c.Open(out, c.nonce(n), ciphertext, ad)
-}
-
-func (c cpabe) GenerateAndSaveMasterKeys() error {
+func (c Cpabe) GenerateAndSaveMasterKeys() error {
 	pk, sk, err := c.PubKeygen()
 	if err != nil {
 		return err
@@ -111,7 +60,7 @@ func (c cpabe) GenerateAndSaveMasterKeys() error {
 	return nil
 }
 
-func (c cpabe) PubKeygen() (*abe.FAMEPubKey, *abe.FAMESecKey, error) {
+func (c Cpabe) PubKeygen() (*abe.FAMEPubKey, *abe.FAMESecKey, error) {
 	pk, sk, err := c.scheme.GenerateMasterKeys()
 	if err != nil {
 		return nil, nil, err
@@ -119,7 +68,7 @@ func (c cpabe) PubKeygen() (*abe.FAMEPubKey, *abe.FAMESecKey, error) {
 	return pk, sk, err
 }
 
-func (c cpabe) PrivKeygen(sk *abe.FAMESecKey, attributes []string) (*abe.FAMEAttribKeys, error) {
+func (c Cpabe) PrivKeygen(sk *abe.FAMESecKey, attributes []string) (*abe.FAMEAttribKeys, error) {
 	ak, err := c.scheme.GenerateAttribKeys(attributes, sk)
 	if err != nil {
 		return nil, err
@@ -131,11 +80,11 @@ type PublicKey abe.FAMEPubKey
 type AttrKey abe.FAMEAttribKeys
 type SecretKey abe.FAMESecKey
 
-func (k PublicKey) Marshal() ([]byte, error) {
+func MarshalPubKey(k abe.FAMEPubKey) ([]byte, error) {
 	return json.Marshal(k)
 }
 
-func (k AttrKey) Marshal() ([]byte, error) {
+func MarshalAttribKey(k abe.FAMEAttribKeys) ([]byte, error) {
 	return json.Marshal(k)
 }
 
@@ -164,40 +113,45 @@ func UnmarshalFameAttrKey(data []byte) (*AttrKey, error) {
 	return k, err
 }
 
-type cpabe struct {
+type Cpabe struct {
 	scheme *abe.FAME
 	pubKey *abe.FAMEPubKey
 	attKey *abe.FAMEAttribKeys
 }
 
-func NewCPABE(isPublisher bool, keyPath string) *cpabe {
-
-	s := &cpabe{
+func NewCPABE() *Cpabe {
+	return &Cpabe{
 		scheme: abe.NewFAME(),
 	}
-	//one is loaded, the other not
-	if isPublisher {
-		s.pubKey = &abe.FAMEPubKey{}
-		s.attKey = &abe.FAMEAttribKeys{}
-	} else {
-		s.pubKey = &abe.FAMEPubKey{}
-		s.attKey = &abe.FAMEAttribKeys{}
-	}
-	return s
+}
+
+func (c *Cpabe) GetKeys() {
+	fmt.Println("Public Key:")
+	fmt.Println(c.pubKey)
+	fmt.Println("Attribute Key:")
+	fmt.Println(c.attKey)
+}
+
+func (c *Cpabe) SetPublicKey(key *abe.FAMEPubKey) {
+	c.pubKey = key
+}
+
+func (c *Cpabe) SetAttribKey(key *abe.FAMEAttribKeys) {
+	c.attKey = key
 }
 
 // FAME encryption function wrapper
-func (c cpabe) Encrypt(msg string, msp *abe.MSP) (*abe.FAMECipher, error) {
+func (c Cpabe) Encrypt(msg string, msp *abe.MSP) (*abe.FAMECipher, error) {
 	return c.scheme.Encrypt(msg, msp, c.pubKey)
 }
 
 // FAME decryption function wrapper
-func (c cpabe) Decrypt(ciphertext *abe.FAMECipher) (string, error) {
+func (c Cpabe) Decrypt(ciphertext *abe.FAMECipher) (string, error) {
 	return c.scheme.Decrypt(ciphertext, c.attKey, nil)
 }
 
 // Encrypt and encode
-func (c cpabe) EncryptEncode(key *abe.FAMEPubKey, policy string, plaintext string) ([]byte, error) {
+func (c Cpabe) EncryptEncode(policy string, plaintext string) ([]byte, error) {
 	msp, err := abe.BooleanToMSP(policy, false)
 	if err != nil {
 		return nil, err
@@ -221,12 +175,15 @@ func loadKey(path string) (any, error) {
 	return nil, nil
 }
 
-func (c cpabe) DecryptDecode(ciphertext []byte) (*string, error) {
+func (c Cpabe) DecryptDecode(ciphertext []byte) (string, error) {
 	var ct *abe.FAMECipher
 	err := json.Unmarshal(ciphertext, &ct)
+	if err != nil {
+		return "", fmt.Errorf("error decoding ciphertext: %s", err)
+	}
 	pt, err := c.Decrypt(ct)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return &pt, nil
+	return pt, nil
 }

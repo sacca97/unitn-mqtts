@@ -26,55 +26,81 @@ type mqttConfig struct {
 	Version              int
 }
 
-func Init() {
+type MqttClient struct {
+	client           mqtt.Client
+	encryptionScheme *crypto.Cpabe
+}
+
+func NewClient(broker string) *MqttClient {
+	c := &MqttClient{}
 	cfg := mqtt.NewClientOptions()
-	cfg.AddBroker("tcp://broker.emqx.io:1883")
-	cfg.SetClientID("go_mqtt_client")
-	cfg.SetUsername("emqx")
-	cfg.SetPassword("public")
+	cfg.AddBroker(broker)
+	cfg.SetClientID("test")
+
 	cfg.SetDefaultPublishHandler(messageHandler)
 	cfg.OnConnect = connectionHandler
 	cfg.OnConnectionLost = connectionLostHandler
-	client := mqtt.NewClient(cfg)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		panic(token.Error())
-	}
-	Subscribe(client, "topic/test", 0)
-	Publish(client, "topic/test", []byte("Hello World!"))
-
+	c.client = mqtt.NewClient(cfg)
+	c.encryptionScheme = crypto.NewCPABE()
+	return c
 }
 
-func HandleEncrypted(msg mqtt.Message) {
-	ciphertext := msg.Payload()
-	plaintext, err := crypto.NewCPABE(false, "").DecryptDecode(ciphertext)
-	if err != nil {
-		fmt.Println(plaintext)
+func Connect(client *MqttClient) {
+	if token := client.client.Connect(); token.Wait() && token.Error() != nil {
+		panic(token.Error())
 	}
-	mqtt.NewClientOptions()
+}
+
+func Init(s crypto.Cpabe) {
+
+	public, secret, _ := s.PubKeygen()
+	attribute, _ := s.PrivKeygen(secret, []string{"0", "1", "2", "3", "5"})
+	s.SetAttribKey(attribute)
+	s.SetPublicKey(public)
+
+	/*Subscribe(client, "simola/test", 0)
+	msg := "This is a test message"
+	policy := "((0 AND 1) OR (2 AND 3)) AND 5"
+	payload, _ := s.EncryptEncode(policy, msg)
+	fmt.Println(len(payload))
+	Publish(client, "simola/test", payload)*/
+}
+
+func HandleEncrypted(c crypto.Cpabe, payload []byte) {
+
+	//If key not loaded, load it
+
+	//Need to find a way to save the state and the keys
+
+	plaintext, err := c.DecryptDecode(payload)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(plaintext)
 	//Do something with the plaintext
 }
 
 func Subscribe(client mqtt.Client, topic string, qos byte) {
 	token := client.Subscribe(topic, qos, nil)
 	token.Wait()
+	fmt.Printf("Subscribed to topic: %s\n", topic)
 }
 
-func Publish(client mqtt.Client, topic string, payload []byte) error {
+func Publish(client mqtt.Client, topic string, payload []byte) {
 	token := client.Publish(topic, 0, false, payload)
 	token.Wait()
-	return nil
 }
 
 func isEncrypted(msg mqtt.Message) bool {
 	//TODO: Check if the message is encrypted
-	return false
+	return true
 }
 
 var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 	if isEncrypted(msg) {
-		HandleEncrypted(msg)
+		//HandleEncrypted(msg.Payload())
 	} else {
-		fmt.Println(msg.Topic(), string(msg.Payload()))
+		fmt.Printf("Received message: %s from topic: %s\n", string(msg.Payload()), msg.Topic())
 	}
 }
 
