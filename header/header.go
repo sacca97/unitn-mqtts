@@ -7,7 +7,11 @@ const (
 type Header struct {
 	CipherType uint8
 	Cipher     uint8
-	Nonce      uint64
+}
+
+type SymHeader struct {
+	Header
+	Nonce uint64
 }
 
 func Encode(ct uint8, cipher uint8, nonce uint64) []byte {
