@@ -1,104 +1,137 @@
 package mqtts
 
 import (
-	"fmt"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
+	"io/ioutil"
 	"time"
-
-	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/sacca97/unitn-mqtts/crypto"
 )
 
-type mqttConfig struct {
-	Brokers              []string
-	ClientID             string
-	Username             string
-	Password             string
-	Topics               []string
-	QoS                  int
-	Retained             bool
-	AutoReconnect        bool
-	MaxReconnectInterval time.Duration
-	PersistentSession    bool
-	KeepAlive            uint16
-	TLSCA                string
-	TLSCert              string
-	TLSKey               string
-	Version              int
+type handler func(topic string, payload []byte)
+type responseHandler func(responseTopic string, payload []byte, id []byte)
+
+// MQTT is an interface for mqttv3 and mqttv5 structs.
+type MQTT interface {
+	// Handle handles new messages to subscribed topics.
+	Handle(handler)
+	//Handles encrypted messages
+	Decrypt([]byte) (string, error)
+	//Set the enc/dec keys
+	SetKeys()
+	// Publish sends a message to broker with a specific topic.
+	Publish(string, string, any) error
+	// Request sends a message to broker and waits for the response.
+	Request(string, any, time.Duration, handler) error
+	// RequestWith sends a message to broker with specific response topic,
+	// and waits for the response.
+	RequestWith(string, string, any, time.Duration, handler) error
+	// SubscribeResponse creates new subscription for response topic.
+	SubscribeResponse(string) error
+	// Respond sends message to response topic with correlation id (use inside HandleRequest).
+	Respond(string, any, []byte) error
+	// HandleRequest handles imcoming request.
+	HandleRequest(responseHandler)
+	// GetConnectionStatus returns the connection status: Connected or Disconnected
+	GetConnectionStatus() ConnectionState
+	// Disconnect will close the connection to broker.
+	Disconnect()
 }
 
-type MqttClient struct {
-	client           mqtt.Client
-	encryptionScheme *crypto.Cpabe
+// Version of the client
+type Version int
+
+const (
+	// V3 is MQTT Version 3
+	V3 Version = iota
+	// V5 is MQTT Version 5
+	V5
+)
+
+// ConnectionState of the Client
+type ConnectionState int
+
+const (
+	// Disconnected : no connection to broker
+	Disconnected ConnectionState = iota
+	// Connected : connection established to broker
+	Connected
+)
+
+// Config contains configurable options for connecting to broker(s).
+type Config struct {
+	Brokers              []string      // MQTT Broker address. Format: scheme://host:port
+	ClientID             string        // Client ID
+	Username             string        // Username to connect the broker(s)
+	Password             string        // Password to connect the broker(s)
+	Topics               []string      // Topics for subscription
+	QoS                  int           // QoS
+	Retained             bool          // Retain Message
+	AutoReconnect        bool          // Reconnect if connection is lost
+	MaxReconnectInterval time.Duration // Maximum time that will be waited between reconnection attempts
+	PersistentSession    bool          // Set persistent(clean start for v5) of session
+	KeepAlive            uint16        // Keep Alive time in sec
+	TLSCA                string        // CA file path
+	TLSCert              string        // Cert file path
+	TLSKey               string        // Key file path
+	Version              Version       // MQTT Version of client
 }
 
-func NewClient(broker string) *MqttClient {
-	c := &MqttClient{}
-	cfg := mqtt.NewClientOptions()
-	cfg.AddBroker(broker)
-	cfg.SetClientID("test")
+// CreateConnection will automatically create connection to broker(s) with MQTTConfig parameters.
+func (m *Config) CreateConnection() (MQTT, error) {
 
-	cfg.SetDefaultPublishHandler(messageHandler)
-	cfg.OnConnect = connectionHandler
-	cfg.OnConnectionLost = connectionLostHandler
-	c.client = mqtt.NewClient(cfg)
-	c.encryptionScheme = crypto.NewCPABE()
-	return c
-}
-
-func Connect(client *MqttClient) {
-	if token := client.client.Connect(); token.Wait() && token.Error() != nil {
-		panic(token.Error())
+	if len(m.Brokers) == 0 {
+		return nil, errors.New("no broker address to connect")
 	}
-}
 
-func Init(s crypto.Cpabe) {
-
-	public, secret, _ := s.PubKeygen()
-	attribute, _ := s.PrivKeygen(secret, []string{"0", "1", "2", "3", "5"})
-	s.SetAttribKey(attribute)
-	s.SetPublicKey(public)
-
-	/*Subscribe(client, "simola/test", 0)
-	msg := "This is a test message"
-	policy := "((0 AND 1) OR (2 AND 3)) AND 5"
-	payload, _ := s.EncryptEncode(policy, msg)
-	fmt.Println(len(payload))
-	Publish(client, "simola/test", payload)*/
-}
-
-func HandleEncrypted(c crypto.Cpabe, payload []byte) {
-
-	//If key not loaded, load it
-
-	//Need to find a way to save the state and the keys
-
-	plaintext, err := c.DecryptDecode(payload)
-	if err != nil {
-		fmt.Println(err)
+	if m.QoS > 2 || m.QoS < 0 {
+		return nil, errors.New("value of qos must be 0, 1, 2")
 	}
-	fmt.Println(plaintext)
-	//Do something with the plaintext
+
+	switch m.Version {
+	case V3:
+		client, err := newMQTTv3(m)
+		if err != nil {
+			return nil, err
+		}
+
+		return client, nil
+	case V5:
+		client, err := newMQTTv3(m) //newMQTTv5(m)
+		if err != nil {
+			return nil, err
+		}
+
+		return client, nil
+	}
+
+	return nil, nil
 }
 
-func Subscribe(client mqtt.Client, topic string, qos byte) {
-	token := client.Subscribe(topic, qos, nil)
-	token.Wait()
-	fmt.Printf("Subscribed to topic: %s\n", topic)
-}
+func (m *Config) tlsConfig() (*tls.Config, error) {
 
-func Publish(client mqtt.Client, topic string, payload []byte) {
-	token := client.Publish(topic, 0, false, payload)
-	token.Wait()
-}
+	tlsConfig := &tls.Config{}
 
-var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+	if m.TLSCA != "" {
+		pool := x509.NewCertPool()
+		pem, err := ioutil.ReadFile(m.TLSCA)
+		if err != nil {
+			return nil, err
+		}
+		check := pool.AppendCertsFromPEM(pem)
+		if !check {
+			return nil, errors.New("certificate can not added to pool")
+		}
+		tlsConfig.RootCAs = pool
+	}
 
-}
-
-var connectionHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
-	fmt.Println("Connected")
-}
-
-var connectionLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err error) {
-	fmt.Println("Connection lost")
+	if m.TLSCert != "" && m.TLSKey != "" {
+		cert, err := tls.LoadX509KeyPair(m.TLSCert, m.TLSKey)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+		tlsConfig.BuildNameToCertificate()
+	}
+	return tlsConfig, nil
 }
