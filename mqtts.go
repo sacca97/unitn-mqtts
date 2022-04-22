@@ -91,17 +91,8 @@ func Publish(client mqtt.Client, topic string, payload []byte) {
 	token.Wait()
 }
 
-func isEncrypted(msg mqtt.Message) bool {
-	//TODO: Check if the message is encrypted
-	return true
-}
-
 var messageHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-	if isEncrypted(msg) {
-		//HandleEncrypted(msg.Payload())
-	} else {
-		fmt.Printf("Received message: %s from topic: %s\n", string(msg.Payload()), msg.Topic())
-	}
+
 }
 
 var connectionHandler mqtt.OnConnectHandler = func(client mqtt.Client) {

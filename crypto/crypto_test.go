@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"crypto/rand"
 	"fmt"
 	"testing"
 )
@@ -46,32 +45,3 @@ func TestFAME_OLD(t *testing.T) {
 	fmt.Println(plaintext)
 
 }
-
-func keygen() ([]byte, error) {
-	key := make([]byte, 32)
-
-	_, err := rand.Read(key)
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
-}
-
-/*
-func TestAEAD(t *testing.T) {
-	key, err := keygen()
-	if err != nil {
-		t.Fatalf("Failed to generate key: %v", err)
-	}
-	c := cipherChaChaPoly(key)
-	msg := "This is a test message a mammt"
-
-	ciphertext := c.Encrypt(nil, 0, nil, []byte(msg))
-	plaintext, err := c.Decrypt(nil, 0, nil, ciphertext)
-
-	if err != nil {
-		t.Fatalf("Failed to decrypt: %v", err)
-	}
-	fmt.Println(string(plaintext))
-}
-*/

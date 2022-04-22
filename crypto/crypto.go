@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/cipher"
+	"crypto/rand"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -186,4 +187,13 @@ func (c Cpabe) DecryptDecode(ciphertext []byte) (string, error) {
 		return "", err
 	}
 	return pt, nil
+}
+
+func SymKeygen() [32]byte {
+	var k [32]byte
+	_, err := rand.Read(k[:])
+	if err != nil {
+		panic(err)
+	}
+	return k
 }

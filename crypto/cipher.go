@@ -5,19 +5,27 @@ import (
 	"crypto/cipher"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 
 	"github.com/fentec-project/gofe/abe"
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
-//Cipher is ether an AEAD cipher or a CPABE scheme initialized with keys
+//Cipher is either an AEAD cipher or a CPABE scheme initialized with keys
 type Cipher interface {
-	EncryptAead(uint64, []byte, []byte) ([]byte, error)
-	DecryptAead(uint64, []byte, []byte) ([]byte, error)
-	EncryptAbe(string, string) ([]byte, error)
-	DecryptAbe([]byte) (any, error)
+	Encrypt(uint64, string, string) ([]byte, error)
+	Decrypt(uint64, []byte, []byte) (string, error)
+	//EncryptAead(uint64, []byte, []byte) ([]byte, error)
+	//DecryptAead(uint64, []byte, []byte) ([]byte, error)
+	//EncryptAbe(string, string) ([]byte, error)
+	//DecryptAbe([]byte) (any, error)
 }
+
+/*
+Implementing a new CP-ABE scheme should be easy.
+Create the corresponding struct and implement the methods.
+
+TODO: Check KP-ABE schemes
+*/
 
 //FameCipher represent the FAME CPABE scheme
 type FameCipher struct {
@@ -32,7 +40,7 @@ type AeadCipher struct {
 	nonce func(uint64) []byte
 }
 
-func cipherChaChaPoly(key [32]byte) Cipher {
+func CipherChaChaPoly(key [32]byte) Cipher {
 	c, err := chacha20poly1305.New(key[:])
 	if err != nil {
 		panic(err)
@@ -46,7 +54,7 @@ func cipherChaChaPoly(key [32]byte) Cipher {
 		}}
 }
 
-func cipherAESGCM(key [32]byte) Cipher {
+func CipherAESGCM(key [32]byte) Cipher {
 	c, err := aes.NewCipher(key[:])
 	if err != nil {
 		panic(err)
@@ -65,25 +73,27 @@ func cipherAESGCM(key [32]byte) Cipher {
 	}
 }
 
-func CipherFamePub(pk *abe.FAMEPubKey) Cipher {
-	c := abe.NewFAME()
-	return FameCipher{c, pk, &abe.FAMEAttribKeys{}}
+func CipherFame() FameCipher {
+	return FameCipher{abe.NewFAME(), &abe.FAMEPubKey{}, &abe.FAMEAttribKeys{}}
 }
 
-func CipherFameSub(atk *abe.FAMEAttribKeys) Cipher {
-	c := abe.NewFAME()
-	return FameCipher{c, &abe.FAMEPubKey{}, atk}
+func (c *FameCipher) FameKeygen(attributes []string) (*abe.FAMEPubKey, *abe.FAMEAttribKeys) {
+	pk, sk, _ := c.FAME.GenerateMasterKeys()
+	ak, _ := c.FAME.GenerateAttribKeys(attributes, sk)
+	c.setPubKey(pk)
+	c.setAttribKey(ak)
+	return pk, ak
 }
 
-func (c FameCipher) EncryptAead(n uint64, ad, plaintext []byte) ([]byte, error) {
-	return nil, errors.New("FAME not supported")
+func (c *FameCipher) setPubKey(pk *abe.FAMEPubKey) {
+	c.publicKey = pk
 }
 
-func (c FameCipher) DecryptAead(n uint64, ad, ciphertext []byte) ([]byte, error) {
-	return nil, errors.New("FAME not supported")
+func (c *FameCipher) setAttribKey(ak *abe.FAMEAttribKeys) {
+	c.attribKey = ak
 }
 
-func (c FameCipher) EncryptAbe(policy, msg string) ([]byte, error) {
+func (c FameCipher) Encrypt(u uint64, policy, msg string) ([]byte, error) {
 	msp, err := abe.BooleanToMSP(policy, false)
 	if err != nil {
 		return nil, err
@@ -97,34 +107,26 @@ func (c FameCipher) EncryptAbe(policy, msg string) ([]byte, error) {
 		return nil, err
 	}
 	return cipertext, nil
-
 }
 
-func (c FameCipher) DecryptAbe(ciphertext []byte) (any, error) {
+func (c FameCipher) Decrypt(u uint64, ad, ciphertext []byte) (string, error) {
 	var ct *abe.FAMECipher
 	err := json.Unmarshal(ciphertext, &ct)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	msg, err := c.FAME.Decrypt(ct, c.attribKey, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return msg, nil
 }
 
-func (c AeadCipher) EncryptAead(n uint64, ad, plaintext []byte) ([]byte, error) {
-	return c.Seal(nil, c.nonce(n), plaintext, ad), nil
+func (c AeadCipher) Encrypt(n uint64, ad, plaintext string) ([]byte, error) {
+	return c.Seal(nil, c.nonce(n), []byte(plaintext), []byte(ad)), nil
 }
 
-func (c AeadCipher) DecryptAead(n uint64, ad, ciphertext []byte) ([]byte, error) {
-	return c.Open(nil, c.nonce(n), ciphertext, ad)
-}
-
-func (c AeadCipher) EncryptAbe(policy, msg string) ([]byte, error) {
-	return nil, errors.New("AeadCipher not supported")
-}
-
-func (c AeadCipher) DecryptAbe(ciphertext []byte) (any, error) {
-	return nil, errors.New("AeadCipher not supported")
+func (c AeadCipher) Decrypt(n uint64, ad, ciphertext []byte) (string, error) {
+	plaintext, err := c.Open(nil, c.nonce(n), ciphertext, ad)
+	return string(plaintext), err
 }

@@ -4,32 +4,32 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/fentec-project/gofe/abe"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFame(t *testing.T) {
-	auth := abe.NewFAME()
-	pk, sk, err := auth.GenerateMasterKeys()
+	pub := CipherFame()
+	sub := CipherFame() //cipherFame()
+	pk, sk, err := pub.FAME.GenerateMasterKeys()
 	if err != nil {
 		t.Fatalf("Failed to generate master keys: %v", err)
 	}
 	attributes := []string{"0", "1", "2", "3", "5"}
-	ak, err := auth.GenerateAttribKeys(attributes, sk)
+	ak, err := pub.FAME.GenerateAttribKeys(attributes, sk)
 	if err != nil {
 		t.Fatalf("Failed to generate attribute keys: %v", err)
 	}
-	pub := CipherFamePub(pk)
-	sub := CipherFameSub(ak)
+	pub.setPubKey(pk)
+	sub.setAttribKey(ak)
 
 	msg := "This is a test message"
 	policy := "((0 AND 1) OR (2 AND 3)) AND 5"
 
-	ciphertext, err := pub.EncryptAbe(policy, msg)
+	ciphertext, err := pub.Encrypt(0, policy, msg)
 	if err != nil {
 		t.Fatalf("Encryption failure: %v", err)
 	}
-	plaintext, err := sub.DecryptAbe(ciphertext)
+	plaintext, err := sub.Decrypt(0, nil, ciphertext)
 	if err != nil {
 		t.Fatalf("Failed to decrypt: %v", err)
 	}
@@ -44,13 +44,13 @@ func TestChaCha20(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	c := cipherChaChaPoly(secretKey)
+	c := CipherChaChaPoly(secretKey)
 	msg := "This is a test message"
-	ciphertext, err := c.EncryptAead(0, nil, []byte(msg))
+	ciphertext, err := c.Encrypt(0, "", msg)
 	if err != nil {
 		t.Fatalf("Encryption failure: %v", err)
 	}
-	plaintext, err := c.DecryptAead(0, nil, ciphertext)
+	plaintext, err := c.Decrypt(0, nil, ciphertext)
 	if err != nil {
 		t.Fatalf("Failed to decrypt: %v", err)
 	}
@@ -63,15 +63,15 @@ func TestAESGCM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	c := cipherAESGCM(secretKey)
+	c := CipherAESGCM(secretKey)
 	msg := "This is a test message"
-	ciphertext, err := c.EncryptAead(0, nil, []byte(msg))
+	ciphertext, err := c.Encrypt(1234, "simoladoveilsugo", msg)
 	if err != nil {
 		t.Fatalf("Encryption failure: %v", err)
 	}
-	plaintext, err := c.DecryptAead(0, nil, ciphertext)
+	plaintext, err := c.Decrypt(1234, []byte("simoladoveilsugo"), ciphertext)
 	if err != nil {
 		t.Fatalf("Failed to decrypt: %v", err)
 	}
-	assert.Equal(t, msg, string(plaintext))
+	assert.Equal(t, msg, plaintext)
 }

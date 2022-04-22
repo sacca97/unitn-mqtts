@@ -1,18 +1,19 @@
 package mqtts
 
 import (
+	"errors"
 	"log"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	abe "github.com/sacca97/unitn-mqtts/crypto"
+	"github.com/sacca97/unitn-mqtts/crypto"
 )
 
 type mqttv3 struct {
 	client     mqtt.Client
 	state      ConnectionState
 	config     Config
-	cipher     abe.Cpabe
+	cipher     crypto.Cipher
 	messages   chan mqtt.Message
 	disconnect chan bool
 }
@@ -21,7 +22,7 @@ func newMQTTv3(config *Config) (MQTT, error) {
 	m := mqttv3{
 		state:      Disconnected,
 		config:     *config,
-		cipher:     *abe.NewCPABE(),
+		cipher:     crypto.CipherFame(),
 		messages:   make(chan mqtt.Message),
 		disconnect: make(chan bool, 1),
 	}
@@ -35,10 +36,13 @@ func newMQTTv3(config *Config) (MQTT, error) {
 }
 
 func (m *mqttv3) SetKeys() {
-	public, secret, _ := m.cipher.PubKeygen()
-	attribute, _ := m.cipher.PrivKeygen(secret, []string{"0", "1", "2", "3", "5"})
-	m.cipher.SetAttribKey(attribute)
-	m.cipher.SetPublicKey(public)
+	//Is this legal?
+	c, ok := m.cipher.(crypto.FameCipher)
+	if !ok {
+		log.Fatal("Cipher is not a FAME cipher")
+	}
+	c.FameKeygen([]string{"0", "1", "2", "3", "5"})
+	m.cipher = c
 }
 
 // Handle handles new messages to subscribed topics.
@@ -49,39 +53,47 @@ func (m *mqttv3) Handle(h handler) {
 			case <-m.disconnect:
 				return
 			case msg := <-m.messages:
-				h(msg.Topic(), msg.Payload())
+				if isEncrypted(msg) {
+					dec, err := m.Decrypt(msg.Payload())
+					if err != nil {
+						log.Println("Error:", err)
+						continue
+					}
+					h(msg.Topic(), []byte(dec))
+				} else {
+					h(msg.Topic(), msg.Payload())
+				}
 			}
 		}
 	}()
+}
+
+func isEncrypted(msg mqtt.Message) bool {
+	//TODO: Check if the message is encrypted
+	return true
+}
+
+func (m *mqttv3) handleEncrypted() {
+
 }
 
 func (m *mqttv3) Decrypt(payload []byte) (string, error) {
-	return m.cipher.DecryptDecode(payload)
-}
-
-func (m *mqttv3) HandleEncrypted(h handler) {
-	go func() {
-		for {
-			select {
-			case <-m.disconnect:
-				return
-			case msg := <-m.messages:
-				payload, _ := m.cipher.DecryptDecode(msg.Payload())
-				h(msg.Topic(), []byte(payload))
-			}
-		}
-	}()
+	return m.cipher.Decrypt(0, nil, payload)
 }
 
 // Publish will send a message to broker with a specific topic.
-func (m *mqttv3) Publish(topic string, policy string, payload any) error {
-	pl, ok := payload.(string)
+func (m *mqttv3) Publish(topic, policy string, payload any) error {
+	s, ok := payload.(string)
 	if !ok {
-		log.Fatal("Error: payload is not a string")
+		return errors.New("wrong payload format")
+	}
+	enc, err := m.cipher.Encrypt(0, policy, s)
+	if err != nil {
+		return err
 	}
 
-	ciphertext, _ := m.cipher.EncryptEncode("((0 AND 1) OR (2 AND 3)) AND 5", pl)
-	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, ciphertext)
+	//ciphertext, _ := m.cipher.EncryptEncode("((0 AND 1) OR (2 AND 3)) AND 5", pl)
+	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, enc)
 	token.Wait()
 	if token.Error() != nil {
 		return token.Error()
@@ -94,7 +106,7 @@ func (m *mqttv3) NewCryptoHeader() []byte {
 }
 
 func (m *mqttv3) PublishEncrypted(topic string, policy string, payload any) error {
-	pl, ok := payload.(string)
+	/*pl, ok := payload.(string)
 	if !ok {
 		log.Fatal("Error: payload is not a string")
 	}
@@ -104,7 +116,7 @@ func (m *mqttv3) PublishEncrypted(topic string, policy string, payload any) erro
 	token.Wait()
 	if token.Error() != nil {
 		return token.Error()
-	}
+	}*/
 	return nil
 }
 

@@ -11,7 +11,7 @@ func Main() {
 	keepAlive := make(chan os.Signal, 1)
 	signal.Notify(keepAlive, os.Interrupt, syscall.SIGTERM)
 	config := Config{
-		Brokers:              []string{"localhost:1883"},
+		Brokers:              []string{"192.168.188.63:1883"},
 		ClientID:             "nero",
 		Username:             "",
 		Password:             "",
@@ -31,14 +31,11 @@ func Main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	client.SetKeys()
 
 	client.Handle(func(topic string, payload []byte) {
-		plaintext, err := client.Decrypt(payload)
-		if err != nil {
-			log.Println(err)
-		}
-		log.Printf("%s: %s", topic, plaintext)
+		log.Printf("%s: %s", topic, string(payload))
 	})
 	err = client.Publish("test/simola", "((0 AND 1) OR (2 AND 3)) AND 5", "Hello World!")
 	if err != nil {
