@@ -14,6 +14,7 @@ import (
 type Cipher interface {
 	Encrypt(uint64, string, string) ([]byte, error)
 	Decrypt(uint64, []byte, []byte) (string, error)
+	Keygen() error
 }
 
 /*
@@ -81,9 +82,15 @@ func CipherFame() FameCipher {
 func (c *FameCipher) FameKeygen(attributes []string) (*abe.FAMEPubKey, *abe.FAMEAttribKeys) {
 	pk, sk, _ := c.FAME.GenerateMasterKeys()
 	ak, _ := c.FAME.GenerateAttribKeys(attributes, sk)
-	c.setPubKey(pk)
-	c.setAttribKey(ak)
 	return pk, ak
+}
+
+func (c FameCipher) Keygen() error {
+	attributes := []string{"0", "1", "2", "3", "5"}
+	pk, ak := c.FameKeygen(attributes)
+	c.publicKey = pk
+	c.attribKey = ak
+	return nil
 }
 
 func (c *FameCipher) setPubKey(pk *abe.FAMEPubKey) {
@@ -94,6 +101,7 @@ func (c *FameCipher) setAttribKey(ak *abe.FAMEAttribKeys) {
 	c.attribKey = ak
 }
 
+// Encrypts a message MSG with a POLICY using the FAME CP-ABE scheme
 func (c FameCipher) Encrypt(u uint64, policy, msg string) ([]byte, error) {
 	msp, err := abe.BooleanToMSP(policy, false)
 	if err != nil {
@@ -110,6 +118,7 @@ func (c FameCipher) Encrypt(u uint64, policy, msg string) ([]byte, error) {
 	return cipertext, nil
 }
 
+// Decrypts a ciphertext generated using the FAME CP-ABE scheme
 func (c FameCipher) Decrypt(u uint64, ad, ciphertext []byte) (string, error) {
 	var ct *abe.FAMECipher
 	err := json.Unmarshal(ciphertext, &ct)
@@ -121,6 +130,10 @@ func (c FameCipher) Decrypt(u uint64, ad, ciphertext []byte) (string, error) {
 		return "", err
 	}
 	return msg, nil
+}
+
+func (c AeadCipher) Keygen() error {
+	return nil
 }
 
 func (c AeadCipher) Encrypt(n uint64, ad, plaintext string) ([]byte, error) {

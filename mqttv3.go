@@ -1,6 +1,7 @@
 package mqtts
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -43,7 +44,7 @@ func (m *mqttv3) SetKeys() {
 	if !ok {
 		log.Fatal("Cipher is not a FAME cipher")
 	}
-	c.FameKeygen([]string{"0", "1", "2", "3", "5"})
+	c.Keygen() //FameKeygen([]string{"0", "1", "2", "3", "5"})
 	m.cipher = c
 }
 
@@ -56,12 +57,7 @@ func (m *mqttv3) Handle(h handler) {
 				return
 			case msg := <-m.messages:
 				if isEncrypted(msg) {
-					dec, err := m.Decrypt(msg.Payload()[9:])
-					if err != nil {
-						log.Println("Error:", err)
-						continue
-					}
-					h(msg.Topic(), []byte(dec))
+					m.handleEncrypted(msg, h)
 				} else {
 					h(msg.Topic(), msg.Payload())
 				}
@@ -80,12 +76,18 @@ func isEncrypted(msg mqtt.Message) bool {
 	//TODO: Define policies and constants
 }
 
-func (m *mqttv3) handleEncrypted() {
-
+func (m *mqttv3) handleEncrypted(msg mqtt.Message, h handler) {
+	dec, err := m.Decrypt(msg.Payload())
+	if err != nil {
+		log.Println("Decryption error:", err)
+		return
+	}
+	h(msg.Topic(), []byte(dec))
 }
 
 func (m *mqttv3) Decrypt(payload []byte) (string, error) {
-	return m.cipher.Decrypt(0, nil, payload)
+	//Decide what's the algo before calling it
+	return m.cipher.Decrypt(binary.LittleEndian.Uint64(payload[1:9]), nil, payload[9:])
 }
 
 // Publish will send a message to broker with a specific topic.
@@ -99,7 +101,6 @@ func (m *mqttv3) Publish(topic, policy string, payload any) error {
 		return err
 	}
 	p := append(NewCryptoHeader(), enc...)
-	//ciphertext, _ := m.cipher.EncryptEncode("((0 AND 1) OR (2 AND 3)) AND 5", pl)
 	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, p)
 	token.Wait()
 	if token.Error() != nil {
