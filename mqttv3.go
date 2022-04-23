@@ -2,11 +2,13 @@ package mqtts
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/sacca97/unitn-mqtts/crypto"
+	"github.com/sacca97/unitn-mqtts/header"
 )
 
 type mqttv3 struct {
@@ -54,7 +56,7 @@ func (m *mqttv3) Handle(h handler) {
 				return
 			case msg := <-m.messages:
 				if isEncrypted(msg) {
-					dec, err := m.Decrypt(msg.Payload())
+					dec, err := m.Decrypt(msg.Payload()[9:])
 					if err != nil {
 						log.Println("Error:", err)
 						continue
@@ -69,8 +71,13 @@ func (m *mqttv3) Handle(h handler) {
 }
 
 func isEncrypted(msg mqtt.Message) bool {
-	//TODO: Check if the message is encrypted
-	return true
+	h := msg.Payload()[:9]
+	hdr := header.Header{}
+	hdr.Decode(h)
+	fmt.Println(hdr)
+
+	return hdr.Type == 1 && hdr.Cipher == 2 && hdr.Nonce == 0
+	//TODO: Define policies and constants
 }
 
 func (m *mqttv3) handleEncrypted() {
@@ -91,9 +98,9 @@ func (m *mqttv3) Publish(topic, policy string, payload any) error {
 	if err != nil {
 		return err
 	}
-
+	p := append(NewCryptoHeader(), enc...)
 	//ciphertext, _ := m.cipher.EncryptEncode("((0 AND 1) OR (2 AND 3)) AND 5", pl)
-	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, enc)
+	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, p)
 	token.Wait()
 	if token.Error() != nil {
 		return token.Error()
@@ -101,23 +108,8 @@ func (m *mqttv3) Publish(topic, policy string, payload any) error {
 	return nil
 }
 
-func (m *mqttv3) NewCryptoHeader() []byte {
-	return nil
-}
-
-func (m *mqttv3) PublishEncrypted(topic string, policy string, payload any) error {
-	/*pl, ok := payload.(string)
-	if !ok {
-		log.Fatal("Error: payload is not a string")
-	}
-
-	ciphertext, _ := m.cipher.EncryptEncode(policy, pl)
-	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, ciphertext)
-	token.Wait()
-	if token.Error() != nil {
-		return token.Error()
-	}*/
-	return nil
+func NewCryptoHeader() []byte {
+	return header.Encode(make([]byte, 9), 1, 2, 0)
 }
 
 // Request sends a message to broker and waits for the response.

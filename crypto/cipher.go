@@ -14,10 +14,6 @@ import (
 type Cipher interface {
 	Encrypt(uint64, string, string) ([]byte, error)
 	Decrypt(uint64, []byte, []byte) (string, error)
-	//EncryptAead(uint64, []byte, []byte) ([]byte, error)
-	//DecryptAead(uint64, []byte, []byte) ([]byte, error)
-	//EncryptAbe(string, string) ([]byte, error)
-	//DecryptAbe([]byte) (any, error)
 }
 
 /*
@@ -26,6 +22,11 @@ Create the corresponding struct and implement the methods.
 
 TODO: Check KP-ABE schemes
 */
+
+type CipherFunc interface {
+	Cipher(key [32]byte) Cipher
+	CipherName() string
+}
 
 //FameCipher represent the FAME CPABE scheme
 type FameCipher struct {
