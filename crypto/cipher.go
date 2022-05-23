@@ -75,8 +75,22 @@ func CipherAESGCM(key [32]byte) Cipher {
 	}
 }
 
-func CipherFame() FameCipher {
-	return FameCipher{abe.NewFAME(), &abe.FAMEPubKey{}, &abe.FAMEAttribKeys{}}
+func CipherFame(publisher bool) FameCipher {
+	f := FameCipher{abe.NewFAME(), nil, nil}
+	if publisher {
+		pub, err := UnmarshalFamePubKey(loadKey("public.key"))
+		if err != nil {
+			panic(err)
+		}
+		f.setPubKey(pub)
+	} else {
+		attrib, err := UnmarshalFameAttrKey(loadKey("attributes.key"))
+		if err != nil {
+			panic(err)
+		}
+		f.setAttribKey(attrib)
+	}
+	return f
 }
 
 func (c *FameCipher) FameKeygen(attributes []string) (*abe.FAMEPubKey, *abe.FAMEAttribKeys) {

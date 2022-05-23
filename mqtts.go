@@ -15,8 +15,6 @@ type responseHandler func(responseTopic string, payload []byte, id []byte)
 type MQTT interface {
 	// Handle handles new messages to subscribed topics.
 	Handle(handler)
-	//Handles encrypted messages
-	Decrypt([]byte) (string, error)
 	//Set the enc/dec keys
 	SetKeys()
 	// Publish sends a message to broker with a specific topic.
@@ -33,7 +31,7 @@ type MQTT interface {
 	// HandleRequest handles imcoming request.
 	HandleRequest(responseHandler)
 	// GetConnectionStatus returns the connection status: Connected or Disconnected
-	GetConnectionStatus() ConnectionState
+	GetConnectionStatus() int8
 	// Disconnect will close the connection to broker.
 	Disconnect()
 }
@@ -48,14 +46,11 @@ const (
 	V5
 )
 
-// ConnectionState of the Client
-type ConnectionState int
-
 const (
 	// Disconnected : no connection to broker
-	Disconnected ConnectionState = iota
+	Disconnected int8 = 0
 	// Connected : connection established to broker
-	Connected
+	Connected int8 = 1
 )
 
 // Config contains configurable options for connecting to broker(s).
@@ -75,6 +70,8 @@ type Config struct {
 	TLSCert              string        // Cert file path
 	TLSKey               string        // Key file path
 	Version              Version       // MQTT Version of client
+	CryptoAlg            string
+	KeyFile              string
 }
 
 // CreateConnection will automatically create connection to broker(s) with MQTTConfig parameters.

@@ -1,14 +1,12 @@
 package mqtts
 
 import (
-	"encoding/binary"
 	"errors"
-	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/sacca97/unitn-mqtts/crypto"
 	"github.com/sacca97/unitn-mqtts/header"
 )
 
@@ -16,16 +14,14 @@ type mqttv3 struct {
 	client     mqtt.Client
 	state      ConnectionState
 	config     Config
-	cipher     crypto.Cipher
 	messages   chan mqtt.Message
 	disconnect chan bool
 }
 
 func newMQTTv3(config *Config) (MQTT, error) {
 	m := mqttv3{
-		state:      Disconnected,
+		state:      *newConnectionState(true, config.CryptoAlg),
 		config:     *config,
-		cipher:     crypto.CipherFame(),
 		messages:   make(chan mqtt.Message),
 		disconnect: make(chan bool, 1),
 	}
@@ -39,13 +35,17 @@ func newMQTTv3(config *Config) (MQTT, error) {
 }
 
 func (m *mqttv3) SetKeys() {
+
+	//loadKey(m.config.Key)
+	//load key carica dei bytes e li passa a un altro metodo che in base al type effettivo del cipher li trasforma e li setta
+
 	//Is this legal?
-	c, ok := m.cipher.(crypto.FameCipher)
-	if !ok {
-		log.Fatal("Cipher is not a FAME cipher")
-	}
-	c.Keygen() //FameKeygen([]string{"0", "1", "2", "3", "5"})
-	m.cipher = c
+	//c, ok := m.cipher.(crypto.FameCipher)
+	//if !ok {
+	//	log.Fatal("Cipher is not a FAME cipher")
+	//}
+	m.state.cipher.Keygen() //FameKeygen([]string{"0", "1", "2", "3", "5"})
+	//m.cipher = c
 }
 
 // Handle handles new messages to subscribed topics.
@@ -56,38 +56,30 @@ func (m *mqttv3) Handle(h handler) {
 			case <-m.disconnect:
 				return
 			case msg := <-m.messages:
-				if isEncrypted(msg) {
-					m.handleEncrypted(msg, h)
-				} else {
-					h(msg.Topic(), msg.Payload())
-				}
+				m.handleEncrypted(msg, h)
 			}
 		}
 	}()
 }
 
-func isEncrypted(msg mqtt.Message) bool {
-	h := msg.Payload()[:9]
-	hdr := header.Header{}
-	hdr.Decode(h)
-	fmt.Println(hdr)
-
-	return hdr.Type == 1 && hdr.Cipher == 2 && hdr.Nonce == 0
-	//TODO: Define policies and constants
-}
-
 func (m *mqttv3) handleEncrypted(msg mqtt.Message, h handler) {
-	dec, err := m.Decrypt(msg.Payload())
-	if err != nil {
-		log.Println("Decryption error:", err)
-		return
-	}
-	h(msg.Topic(), []byte(dec))
-}
+	hdr := header.Header{}
+	hdr.Decode(msg.Payload()[:12])
 
-func (m *mqttv3) Decrypt(payload []byte) (string, error) {
-	//Decide what's the algo before calling it
-	return m.cipher.Decrypt(binary.LittleEndian.Uint64(payload[1:9]), nil, payload[9:])
+	//if encrypted, decrypt
+	if hdr.Type != 0 {
+		dec, err := m.state.cipher.Decrypt(hdr.Nonce, nil, msg.Payload()[12:])
+		if err != nil {
+			log.Println("Decryption error:", err)
+			return
+		}
+		h(msg.Topic(), []byte(dec))
+	} else {
+		h(msg.Topic(), msg.Payload())
+	}
+
+	//else, pass to handler
+
 }
 
 // Publish will send a message to broker with a specific topic.
@@ -96,21 +88,22 @@ func (m *mqttv3) Publish(topic, policy string, payload any) error {
 	if !ok {
 		return errors.New("wrong payload format")
 	}
-	enc, err := m.cipher.Encrypt(0, policy, s)
+	c := atomic.AddUint64(&m.state.atomicMessageCounter, 1)
+	//Here I need to select the right values for the header
+	h := header.Encode(make([]byte, 12), header.Cpabe, header.FAME, c)
+	enc, err := m.state.cipher.Encrypt(c, policy, s)
 	if err != nil {
 		return err
 	}
-	p := append(NewCryptoHeader(), enc...)
-	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, p)
+	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, append(h, enc...))
 	token.Wait()
 	if token.Error() != nil {
+		atomic.AddUint64(&m.state.atomicMessageCounter, ^uint64(0))
+		//If message delivery fails, the counter is decremented
 		return token.Error()
 	}
-	return nil
-}
 
-func NewCryptoHeader() []byte {
-	return header.Encode(make([]byte, 9), 1, 2, 0)
+	return nil
 }
 
 // Request sends a message to broker and waits for the response.
@@ -140,15 +133,15 @@ func (m *mqttv3) HandleRequest(h responseHandler) {
 }
 
 // GetConnectionStatus returns the connection status: Connected or Disconnected
-func (m *mqttv3) GetConnectionStatus() ConnectionState {
-	return m.state
+func (m *mqttv3) GetConnectionStatus() int8 {
+	return m.state.status
 }
 
 // Disconnect will close the connection to broker.
 func (m *mqttv3) Disconnect() {
 	m.client.Disconnect(0)
 	m.client = nil
-	m.state = Disconnected
+	m.state.status = Disconnected
 	m.disconnect <- true
 }
 
@@ -165,7 +158,7 @@ func (m *mqttv3) connect() error {
 		return token.Error()
 	}
 
-	m.state = Connected
+	m.state.status = Connected
 
 	return nil
 }
@@ -215,7 +208,7 @@ func (m *mqttv3) createOptions() (*mqtt.ClientOptions, error) {
 }
 
 func (m *mqttv3) onConnectionLost(c mqtt.Client, err error) {
-	m.state = Disconnected
+	m.state.status = Disconnected
 }
 
 func (m *mqttv3) onConnect(c mqtt.Client) {

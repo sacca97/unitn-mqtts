@@ -8,8 +8,8 @@ import (
 )
 
 func TestFame(t *testing.T) {
-	pub := CipherFame()
-	sub := CipherFame() //cipherFame()
+	pub := CipherFame(true)
+	sub := CipherFame(false) //cipherFame()
 	pk, sk, err := pub.FAME.GenerateMasterKeys()
 	if err != nil {
 		t.Fatalf("Failed to generate master keys: %v", err)
