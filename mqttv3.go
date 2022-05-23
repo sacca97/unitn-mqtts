@@ -19,8 +19,9 @@ type mqttv3 struct {
 }
 
 func newMQTTv3(config *Config) (MQTT, error) {
+
 	m := mqttv3{
-		state:      *newConnectionState(true, config.CryptoAlg),
+		state:      *newConnectionState(config.Publisher, config.CryptoAlg),
 		config:     *config,
 		messages:   make(chan mqtt.Message),
 		disconnect: make(chan bool, 1),
@@ -32,20 +33,6 @@ func newMQTTv3(config *Config) (MQTT, error) {
 	}
 
 	return &m, nil
-}
-
-func (m *mqttv3) SetKeys() {
-
-	//loadKey(m.config.Key)
-	//load key carica dei bytes e li passa a un altro metodo che in base al type effettivo del cipher li trasforma e li setta
-
-	//Is this legal?
-	//c, ok := m.cipher.(crypto.FameCipher)
-	//if !ok {
-	//	log.Fatal("Cipher is not a FAME cipher")
-	//}
-	m.state.cipher.Keygen() //FameKeygen([]string{"0", "1", "2", "3", "5"})
-	//m.cipher = c
 }
 
 // Handle handles new messages to subscribed topics.

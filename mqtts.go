@@ -15,8 +15,6 @@ type responseHandler func(responseTopic string, payload []byte, id []byte)
 type MQTT interface {
 	// Handle handles new messages to subscribed topics.
 	Handle(handler)
-	//Set the enc/dec keys
-	SetKeys()
 	// Publish sends a message to broker with a specific topic.
 	Publish(string, string, any) error
 	// Request sends a message to broker and waits for the response.
@@ -72,6 +70,7 @@ type Config struct {
 	Version              Version       // MQTT Version of client
 	CryptoAlg            string
 	KeyFile              string
+	Publisher            bool
 }
 
 // CreateConnection will automatically create connection to broker(s) with MQTTConfig parameters.
