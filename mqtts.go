@@ -93,7 +93,7 @@ func (m *Config) CreateConnection() (MQTT, error) {
 
 		return client, nil
 	case V5:
-		client, err := newMQTTv3(m) //newMQTTv5(m)
+		client, err := newMQTTv5(m)
 		if err != nil {
 			return nil, err
 		}

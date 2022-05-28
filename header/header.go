@@ -49,7 +49,8 @@ func Create(algo string) []byte {
 
 func Encode(b []byte, ct uint8, c uint8, nonce uint64) []byte {
 	b = b[:Len]
-	b[0] = ct<<4 | byte(c&0x0f)
+	//b[0] = ct<<4 | byte(c&0x0f)
+	b[0] = ct<<2 | byte(c&0x3)
 	binary.BigEndian.PutUint64(b[1:9], nonce)
 	return b
 }
@@ -58,8 +59,10 @@ func (h *Header) Decode(b []byte) error {
 	if len(b) != Len {
 		return fmt.Errorf("invalid header length")
 	}
-	h.Type = uint8((b[0] >> 4) & 0x0f)
-	h.Cipher = uint8(b[0] & 0x0f)
+	//h.Type = uint8((b[0] >> 4) & 0x0f)
+	h.Type = uint8((b[0] >> 2) & 0x3)
+	//h.Cipher = uint8(b[0] & 0x0f)
+	h.Cipher = uint8(b[0] & 0x3)
 	h.Nonce = binary.BigEndian.Uint64(b[1:9])
 
 	return nil

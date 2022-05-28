@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"encoding/binary"
 	"encoding/json"
+	"log"
 
 	"github.com/fentec-project/gofe/abe"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -80,13 +81,13 @@ func CipherFame(publisher bool) FameCipher {
 	if publisher {
 		pub, err := UnmarshalFamePubKey(loadKey("public.key"))
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 		f.setPubKey(pub)
 	} else {
 		attrib, err := UnmarshalFameAttrKey(loadKey("attributes.key"))
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 		f.setAttribKey(attrib)
 	}

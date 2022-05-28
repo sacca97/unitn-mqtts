@@ -9,8 +9,11 @@ require (
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 )
 
+require golang.org/x/sync v0.0.0-20201207232520-09787c993a3a // indirect
+
 require (
 	github.com/davecgh/go-spew v1.1.0 // indirect
+	github.com/eclipse/paho.golang v0.10.0
 	github.com/fentec-project/bn256 v0.0.0-20190726093940-0d0fc8bfeed0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
