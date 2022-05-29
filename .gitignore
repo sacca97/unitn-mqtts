@@ -16,6 +16,6 @@
 # vendor/
 */*.key
 *.key
-test
+test/
 main.go
 
