@@ -205,7 +205,7 @@ func (m *mqttv5) connect() error {
 	}
 
 	if c.Conn == nil {
-		return fmt.Errorf("Failed to connect to %s :", m.brokers)
+		return fmt.Errorf("failed to connect to %s ", m.brokers)
 	}
 
 	// subscribe topics
@@ -233,7 +233,7 @@ func (m *mqttv5) connect() error {
 		}
 
 		if sa.Reasons[0] != byte(m.config.QoS) {
-			return fmt.Errorf("Failed to subscribe: %d", sa.Reasons[0])
+			return fmt.Errorf("failed to subscribe: %d", sa.Reasons[0])
 		}
 	}
 
@@ -264,7 +264,7 @@ func (m *mqttv5) openConnection(uri *url.URL) (net.Conn, error) {
 		return conn, nil
 	}
 
-	return nil, errors.New("other protocols not implemented yet.")
+	return nil, errors.New("protocol not supported")
 }
 
 func (m *mqttv5) createOptions() (*paho.Connect, error) {
@@ -280,7 +280,7 @@ func (m *mqttv5) createOptions() (*paho.Connect, error) {
 		broker = re.ReplaceAllLiteralString(broker, "%25")
 		brokerURI, err := url.Parse(broker)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse %q broker address: %s", broker, err)
+			return nil, fmt.Errorf("failed to parse %q broker address: %s", broker, err)
 		}
 		m.brokers = append(m.brokers, brokerURI)
 	}

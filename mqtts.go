@@ -127,7 +127,6 @@ func (m *Config) tlsConfig() (*tls.Config, error) {
 			return nil, err
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
-		tlsConfig.BuildNameToCertificate()
 	}
 	return tlsConfig, nil
 }
