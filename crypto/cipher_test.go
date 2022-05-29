@@ -8,19 +8,8 @@ import (
 )
 
 func TestFame(t *testing.T) {
-	pub := CipherFame(true)
-	sub := CipherFame(false) //cipherFame()
-	pk, sk, err := pub.FAME.GenerateMasterKeys()
-	if err != nil {
-		t.Fatalf("Failed to generate master keys: %v", err)
-	}
-	attributes := []string{"0", "1", "2", "3", "5"}
-	ak, err := pub.FAME.GenerateAttribKeys(attributes, sk)
-	if err != nil {
-		t.Fatalf("Failed to generate attribute keys: %v", err)
-	}
-	pub.setPubKey(pk)
-	sub.setAttribKey(ak)
+	pub := CipherFame(true, "public.key")
+	sub := CipherFame(false, "attributes.key") //cipherFame()
 
 	msg := "This is a test message"
 	policy := "((0 AND 1) OR (2 AND 3)) AND 5"

@@ -43,6 +43,7 @@ type AeadCipher struct {
 	nonce func(uint64) []byte
 }
 
+//Creates a new ChaCha20 Poly1305 AEAD cipher
 func CipherChaChaPoly(key [32]byte) Cipher {
 	c, err := chacha20poly1305.New(key[:])
 	if err != nil {
@@ -57,6 +58,7 @@ func CipherChaChaPoly(key [32]byte) Cipher {
 		}}
 }
 
+// Creates a new AESGCM cipher with the given key
 func CipherAESGCM(key [32]byte) Cipher {
 	c, err := aes.NewCipher(key[:])
 	if err != nil {
@@ -76,20 +78,23 @@ func CipherAESGCM(key [32]byte) Cipher {
 	}
 }
 
-func CipherFame(publisher bool) FameCipher {
+//Creates a new FameCipher object with the given key
+func CipherFame(publisher bool, keyFile string) FameCipher {
 	f := FameCipher{abe.NewFAME(), nil, nil}
-	if publisher {
-		pub, err := UnmarshalFamePubKey(loadKey("public.key"))
+	typ, key := loadKey(keyFile)
+
+	if publisher && typ == "FAME PUBLIC KEY" {
+		pub, err := UnmarshalFamePubKey(key)
 		if err != nil {
 			log.Fatal(err)
 		}
-		f.setPubKey(pub)
-	} else {
-		attrib, err := UnmarshalFameAttrKey(loadKey("attributes.key"))
+		f.publicKey = pub
+	} else if !publisher && typ == "FAME ATTRIBUTE KEY" {
+		attrib, err := UnmarshalFameAttrKey(key)
 		if err != nil {
 			log.Fatal(err)
 		}
-		f.setAttribKey(attrib)
+		f.attribKey = attrib
 	}
 	return f
 }
@@ -106,14 +111,6 @@ func (c FameCipher) Keygen() error {
 	c.publicKey = pk
 	c.attribKey = ak
 	return nil
-}
-
-func (c *FameCipher) setPubKey(pk *abe.FAMEPubKey) {
-	c.publicKey = pk
-}
-
-func (c *FameCipher) setAttribKey(ak *abe.FAMEAttribKeys) {
-	c.attribKey = ak
 }
 
 // Encrypts a message MSG with a POLICY using the FAME CP-ABE scheme

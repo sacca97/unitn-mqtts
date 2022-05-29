@@ -13,26 +13,25 @@ type ConnectionState struct {
 	status               int8
 }
 
-func newConnectionState(publisher bool, cipher string) *ConnectionState {
-
-	//Decide how to select the cipher
+/* Creates a new ConnectionState with a cryptographic scheme from the
+ * given configuration. If no encryption algorithm is matched fallback to  FAME CP-ABE
+ */
+func newConnectionState(config *Config) *ConnectionState {
 	var c crypto.Cipher
 
-	switch cipher {
+	switch config.Crypto {
 	case "chacha20poly1305":
 		c = crypto.CipherChaChaPoly([32]byte{})
 	case "aesgcm":
 		c = crypto.CipherAESGCM([32]byte{})
 	case "fame":
-		c = crypto.CipherFame(publisher)
-
+		c = crypto.CipherFame(config.Publisher, config.EncryptionKey)
 	default:
-		//Back on FAME algo in case of wrong setup
-		c = crypto.CipherFame(publisher)
+		c = crypto.CipherFame(config.Publisher, config.EncryptionKey)
 	}
 
 	return &ConnectionState{
-		publisher:            publisher,
+		publisher:            config.Publisher,
 		atomicMessageCounter: 0,
 		cipher:               c,
 		status:               0,

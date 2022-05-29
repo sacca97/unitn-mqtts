@@ -33,7 +33,7 @@ type mqttv5 struct {
 func newMQTTv5(config *Config) (MQTT, error) {
 
 	m := mqttv5{
-		state:      *newConnectionState(config.Publisher, config.CryptoAlg),
+		state:      *newConnectionState(config),
 		config:     *config,
 		messages:   make(chan *paho.Publish),
 		requests:   make(map[string]chan *paho.Publish),

@@ -52,14 +52,14 @@ func UnmarshalFameAttrKey(data []byte) (*abe.FAMEAttribKeys, error) {
 	return k, err
 }
 
-func loadKey(path string) []byte {
+func loadKey(path string) (string, []byte) {
 	k, err := ioutil.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}
 	key, _ := pem.Decode(k)
 	//I have to check stuff here obviously
-	return key.Bytes
+	return key.Type, key.Bytes
 }
 
 func SymKeygen() [32]byte {
@@ -72,12 +72,10 @@ func SymKeygen() [32]byte {
 }
 
 func NewPem(name string, k []byte) *pem.Block {
-	out := &pem.Block{
+	return &pem.Block{
 		Type:  name,
 		Bytes: k,
 	}
-
-	return out
 }
 
 func Encode(name string, k any) *pem.Block {

@@ -21,7 +21,7 @@ type mqttv3 struct {
 func newMQTTv3(config *Config) (MQTT, error) {
 
 	m := mqttv3{
-		state:      *newConnectionState(config.Publisher, config.CryptoAlg),
+		state:      *newConnectionState(config),
 		config:     *config,
 		messages:   make(chan mqtt.Message),
 		disconnect: make(chan bool, 1),

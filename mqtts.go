@@ -68,8 +68,8 @@ type Config struct {
 	TLSCert              string        // Cert file path
 	TLSKey               string        // Key file path
 	Version              Version       // MQTT Version of client
-	CryptoAlg            string
-	KeyFile              string
+	Crypto               string
+	EncryptionKey        string
 	Publisher            bool
 }
 
