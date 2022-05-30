@@ -12,9 +12,9 @@ const (
 )
 
 const (
-	Symmetric uint8 = 1
-	Cpabe     uint8 = 2
-	Kpabe     uint8 = 3
+	SYMMETRIC uint8 = 1
+	CPABE     uint8 = 2
+	KPABE     uint8 = 3
 )
 
 const (
@@ -36,13 +36,13 @@ func Create(algo string) []byte {
 	h := make([]byte, 12)
 	switch algo {
 	case "chacha20poly1305":
-		Encode(h, 1, 1, 0)
+		Encode(h, SYMMETRIC, CHACHAPOLY, 0)
 	case "aesgcm":
-		Encode(h, 1, 2, 0)
+		Encode(h, SYMMETRIC, AESGCM, 0)
 	case "fame":
-		Encode(h, 2, 1, 0)
+		Encode(h, CPABE, FAME, 0)
 	default:
-		log.Fatal("unsupported crypto algorithm")
+		log.Fatal("unsupported algorithm")
 	}
 	return h
 }

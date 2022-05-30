@@ -32,7 +32,7 @@ func TestKeyLoader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to unmarshal secret key: %s", err)
 	}
-	GenerateAttribKeys(secret, []string{"1", "2", "3", "4", "5"})
+	GenerateAttribKeys(secret, []string{"1", "2", "3", "4", "5"}, "attributes.key")
 	if err != nil {
 		t.Fatalf("Failed to generate attribute keys: %s", err)
 	}

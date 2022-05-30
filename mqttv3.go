@@ -75,18 +75,23 @@ func (m *mqttv3) Publish(topic, policy string, payload any) error {
 	if !ok {
 		return errors.New("wrong payload format")
 	}
-	//c := atomic.AddUint64(&m.state.atomicMessageCounter, 1)
-	//Here I need to select the right values for the header
-	h := header.Encode(make([]byte, 12), header.Cpabe, header.FAME, 0)
-	//Bring encryption outside of the publish function to avoid timeouts, which should be avoidable but idk
-	enc, err := m.state.cipher.Encrypt(0, policy, s)
+	var c uint64 = 0
+	if m.config.Crypto != "fame" {
+		c = atomic.AddUint64(&m.state.atomicMessageCounter, 1)
+	}
+	h := header.Encode(make([]byte, 12), header.CPABE, header.FAME, c)
+
+	//Bring encryption outside of the publish function to avoid timeouts
+	enc, err := m.state.cipher.Encrypt(c, policy, s)
 	if err != nil {
 		return err
 	}
 	token := m.client.Publish(topic, byte(m.config.QoS), m.config.Retained, append(h, enc...))
 	token.Wait()
 	if token.Error() != nil {
-		atomic.AddUint64(&m.state.atomicMessageCounter, ^uint64(0))
+		if m.config.Crypto != "fame" {
+			atomic.AddUint64(&m.state.atomicMessageCounter, ^uint64(0))
+		}
 		//If message delivery fails, the counter is decremented
 		return token.Error()
 	}

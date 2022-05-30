@@ -71,7 +71,7 @@ func (m *mqttv5) Publish(topic, policy string, payload any) error {
 	}
 	//c := atomic.AddUint64(&m.state.atomicMessageCounter, 1)
 
-	h := header.Encode(make([]byte, 12), header.Cpabe, header.FAME, 0)
+	h := header.Encode(make([]byte, 12), header.CPABE, header.FAME, 0)
 	enc, err := m.state.cipher.Encrypt(0, policy, string(p))
 	if err != nil {
 		return err

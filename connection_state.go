@@ -38,6 +38,14 @@ func newConnectionState(config *Config) *ConnectionState {
 	}
 }
 
+func (c *ConnectionState) GetStatus() int8 {
+	return c.status
+}
+
+func (c *ConnectionState) ResetCounter() {
+	c.atomicMessageCounter = 0
+}
+
 func (cs *ConnectionState) MarshalJSON() ([]byte, error) {
 	return json.Marshal(cs)
 }

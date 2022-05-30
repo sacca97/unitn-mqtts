@@ -15,7 +15,6 @@ import (
 type Cipher interface {
 	Encrypt(uint64, string, string) ([]byte, error)
 	Decrypt(uint64, []byte, []byte) (string, error)
-	Keygen() error
 }
 
 /*
@@ -105,14 +104,6 @@ func (c *FameCipher) FameKeygen(attributes []string) (*abe.FAMEPubKey, *abe.FAME
 	return pk, ak
 }
 
-func (c FameCipher) Keygen() error {
-	attributes := []string{"0", "1", "2", "3", "5"}
-	pk, ak := c.FameKeygen(attributes)
-	c.publicKey = pk
-	c.attribKey = ak
-	return nil
-}
-
 // Encrypts a message MSG with a POLICY using the FAME CP-ABE scheme
 func (c FameCipher) Encrypt(u uint64, policy, msg string) ([]byte, error) {
 	msp, err := abe.BooleanToMSP(policy, false)
@@ -142,10 +133,6 @@ func (c FameCipher) Decrypt(u uint64, ad, ciphertext []byte) (string, error) {
 		return "", err
 	}
 	return msg, nil
-}
-
-func (c AeadCipher) Keygen() error {
-	return nil
 }
 
 func (c AeadCipher) Encrypt(n uint64, ad, plaintext string) ([]byte, error) {

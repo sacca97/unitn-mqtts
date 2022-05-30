@@ -6,14 +6,11 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/fentec-project/gofe/abe"
 )
-
-func Marshal(k any) ([]byte, error) {
-	return json.Marshal(k)
-}
 
 func UnmarshalFamePrivKey(data []byte) (*abe.FAMESecKey, error) {
 	if len(data) == 0 {
@@ -58,7 +55,9 @@ func loadKey(path string) (string, []byte) {
 		panic(err)
 	}
 	key, _ := pem.Decode(k)
-	//I have to check stuff here obviously
+	if key == nil {
+		panic("invalid key structure")
+	}
 	return key.Type, key.Bytes
 }
 
@@ -71,27 +70,23 @@ func SymKeygen() [32]byte {
 	return k
 }
 
-func NewPem(name string, k []byte) *pem.Block {
-	return &pem.Block{
-		Type:  name,
-		Bytes: k,
-	}
-}
-
 func Encode(name string, k any) *pem.Block {
-	out, err := Marshal(k)
+	out, err := json.Marshal(k)
 	if err != nil {
 		panic(err)
 	}
-	return NewPem(name, out)
+	return &pem.Block{
+		Type:  name,
+		Bytes: out,
+	}
 }
 
-func GenerateFAMEKeys() error {
+func GenerateFAMEKeys() {
 
 	fame := abe.NewFAME()
 	pk, sk, err := fame.GenerateMasterKeys()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 	bytesPublic, _ := json.Marshal(pk)
 	bytesSecret, _ := json.Marshal(sk)
@@ -106,47 +101,45 @@ func GenerateFAMEKeys() error {
 	}
 	pemPublic, err := os.Create("public.key")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	if err := pem.Encode(pemPublic, pub); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	pemSecret, err := os.Create("secret.key")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	if err := pem.Encode(pemSecret, sec); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	pemPublic.Close()
 	pemSecret.Close()
-	return nil
 }
 
-func GenerateAttribKeys(sk *abe.FAMESecKey, attributes []string) error {
+func GenerateAttribKeys(sk *abe.FAMESecKey, attributes []string, fileName string) {
 	fame := abe.NewFAME()
-	ak, err := fame.GenerateAttribKeys([]string{"1", "2", "3", "4", "5"}, sk)
+	ak, err := fame.GenerateAttribKeys(attributes, sk)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 	bytesAttr, _ := json.Marshal(ak)
 	attr := &pem.Block{
 		Type:  "FAME ATTRIBUTES KEY",
 		Bytes: bytesAttr,
 	}
-	pemAttr, err := os.Create("attributes.key")
+	if fileName == "" {
+		fileName = "attributes.key"
+	}
+	pemAttr, err := os.Create(fileName)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	if err := pem.Encode(pemAttr, attr); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	pemAttr.Close()
 
-	return nil
 }
