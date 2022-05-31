@@ -38,9 +38,7 @@ type MQTT interface {
 type Version int
 
 const (
-	// V3 is MQTT Version 3
 	V3 Version = iota
-	// V5 is MQTT Version 5
 	V5
 )
 
@@ -68,9 +66,9 @@ type Config struct {
 	TLSCert              string        // Cert file path
 	TLSKey               string        // Key file path
 	Version              Version       // MQTT Version of client
-	Crypto               string
-	EncryptionKey        string
-	Publisher            bool
+	Crypto               string        // Crypto algorithm
+	EncryptionKey        string        // Encryption key file path
+	Publisher            bool          // Publisher
 }
 
 // CreateConnection will automatically create connection to broker(s) with MQTTConfig parameters.
@@ -116,7 +114,7 @@ func (m *Config) tlsConfig() (*tls.Config, error) {
 		}
 		check := pool.AppendCertsFromPEM(pem)
 		if !check {
-			return nil, errors.New("certificate can not added to pool")
+			return nil, errors.New("cannot add certificate to pool")
 		}
 		tlsConfig.RootCAs = pool
 	}
