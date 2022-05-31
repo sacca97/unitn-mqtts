@@ -50,7 +50,7 @@ if err != nil {
 ```
 
 ## Authors and acknowledgment
-This Secure MQTT extension heavily relies on the following works:
-- github.com/alihanyalcin/mqtt-wrapper
-- github.com/flynn/noise
-- github.com/fentec-project/gofe
+
+- The wrapper structure is based on [alihanyalcin/mqtt-wrapper library](https://github.com/alihanyalcin/mqtt-wrapper)
+
+- The cryptographic modules are based on [flynn/noise library](https://github.com/flynn/noise)
