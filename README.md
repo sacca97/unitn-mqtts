@@ -3,6 +3,12 @@
 ## Description
 MQTTSecure is a MQTT wrapper that adds end-to-end encryption to the protocol. It Ciphertext Policy Attribute Based Encryption (CP-ABE) or Symmetric Encryption (AESGCM, CHACHA20) and it is compatible with MQTTv3 and MQTTv5.
 
+This repo is part of the work done for:
+
+S. Gupta, T. Sacchetti and B. Crispo, "End-to-End Encryption for Securing Communications in Industry 4.0," 2022 4th IEEE Middle East and North Africa COMMunications Conference (MENACOMM), Amman, Jordan, 2022, pp. 153-158, doi: 10.1109/MENACOMM57252.2022.9998272.
+
+(https://ieeexplore.ieee.org/document/9998272)
+
 
 ## Installation
 - Install the package in your Go environment
